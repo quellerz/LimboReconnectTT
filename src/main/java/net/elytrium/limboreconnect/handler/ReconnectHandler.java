@@ -41,6 +41,7 @@ public class ReconnectHandler implements LimboSessionHandler {
   private int titleIndex = -1;
   private final PlaySound waitSound;
   private final PlaySound connectSound;
+  private boolean connectSoundPlayed = false; // Says if the sounds was already played | говорит был ли уже проигран звук
 
   public ReconnectHandler(LimboReconnect plugin, RegisteredServer server) {
     this.plugin = plugin;
@@ -65,6 +66,7 @@ public class ReconnectHandler implements LimboSessionHandler {
   @Override
   public void onDisconnect() {
     this.connected = false;
+    this.connectSoundPlayed = false; // Resets sound counter | Ресетаем счётчик звуков
   }
 
   @Override
@@ -91,7 +93,11 @@ public class ReconnectHandler implements LimboSessionHandler {
           this.connecting = true;
           this.titleIndex = -1;
           this.player.getScheduledExecutor().schedule(() -> {
-            this.player.writePacket(this.connectSound);
+	    if (!connectSoundPlayed) { // Makes sound play only once |  Условие чтобы проиграть звук один раз
+	    	this.player.writePacket(this.connectSound); //
+		this.connectSoundPlayed = true; // Checks that sound was played | отмечает что звук был проигран
+	    }
+	    this.player.writePacket(this.connectSound);
             this.player.getProxyPlayer().resetTitle();
             this.player.disconnect(this.server);
           }, CONFIG.joinDelay, TimeUnit.MILLISECONDS);
