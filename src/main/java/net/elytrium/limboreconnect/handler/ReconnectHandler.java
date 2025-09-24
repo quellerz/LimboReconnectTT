@@ -42,6 +42,7 @@ public class ReconnectHandler implements LimboSessionHandler {
   private final PlaySound waitSound;
   private final PlaySound connectSound;
   private boolean connectSoundPlayed = false; // Says if the sounds was already played | говорит был ли уже проигран звук
+  private long lastWaitingPlayAt = 0L;
 
   public ReconnectHandler(LimboReconnect plugin, RegisteredServer server) {
     this.plugin = plugin;
@@ -61,12 +62,27 @@ public class ReconnectHandler implements LimboSessionHandler {
     this.player.setGameMode(CONFIG.world.gamemode);
     this.player.getScheduledExecutor().schedule(this::tick, CONFIG.checkInterval, TimeUnit.MILLISECONDS);
     this.tickMessages();
+
+    // Гарантированно запускаем первую мелодию с небольшой задержкой, чтобы клиент был готов
+    this.player.getScheduledExecutor().schedule(() -> {
+      if (!this.connected || this.connecting) {
+        return;
+      }
+      String name = CONFIG.sounds.waiting.name;
+      if (name != null && !name.isEmpty()) {
+        this.player.writePacket(this.waitSound);
+        this.lastWaitingPlayAt = System.currentTimeMillis();
+      }
+      // Запускаем цикл повторов, если задана длительность
+      this.scheduleWaitingLoop();
+    }, 1, TimeUnit.SECONDS);
   }
 
   @Override
   public void onDisconnect() {
     this.connected = false;
     this.connectSoundPlayed = false; // Resets sound counter | Ресетаем счётчик звуков
+    this.lastWaitingPlayAt = 0L;
   }
 
   @Override
@@ -93,11 +109,10 @@ public class ReconnectHandler implements LimboSessionHandler {
           this.connecting = true;
           this.titleIndex = -1;
           this.player.getScheduledExecutor().schedule(() -> {
-	    if (!connectSoundPlayed) { // Makes sound play only once |  Условие чтобы проиграть звук один раз
-	    	this.player.writePacket(this.connectSound); //
-		this.connectSoundPlayed = true; // Checks that sound was played | отмечает что звук был проигран
-	    }
-	    this.player.writePacket(this.connectSound);
+            if (!connectSoundPlayed) {
+              this.player.writePacket(this.connectSound);
+              this.connectSoundPlayed = true;
+            }
             this.player.getProxyPlayer().resetTitle();
             this.player.disconnect(this.server);
           }, CONFIG.joinDelay, TimeUnit.MILLISECONDS);
@@ -118,7 +133,39 @@ public class ReconnectHandler implements LimboSessionHandler {
       this.titleIndex = (this.titleIndex + 1) % this.plugin.offlineTitles.size();
       this.player.getProxyPlayer().showTitle(this.plugin.offlineTitles.get(this.titleIndex));
     }
-    this.player.writePacket(this.waitSound);
     this.player.getScheduledExecutor().schedule(this::tickMessages, CONFIG.messages.titles.showDelay * 50, TimeUnit.MILLISECONDS);
+  }
+
+  private void scheduleWaitingLoop() {
+    if (!this.connected) {
+      return;
+    }
+
+    if (this.connecting) {
+      return;
+    }
+
+    long baseLen = CONFIG.sounds.waiting.lengthMs;
+    float pitch = CONFIG.sounds.waiting.pitch;
+    long len = baseLen > 0 ? (long) (baseLen / Math.max(0.01f, pitch)) : 0L;
+    if (len <= 0L) {
+      // Нет повторов — сыграли один раз при входе и выходим
+      return;
+    }
+
+    long now = System.currentTimeMillis();
+    long nextAt = (this.lastWaitingPlayAt == 0L) ? now : (this.lastWaitingPlayAt + len);
+    if (now + 25L >= nextAt) {
+      // Время переигрывать
+      String name = CONFIG.sounds.waiting.name;
+      if (name != null && !name.isEmpty()) {
+        this.player.writePacket(this.waitSound);
+        this.lastWaitingPlayAt = now;
+        nextAt = this.lastWaitingPlayAt + len;
+      }
+    }
+
+    long delayMs = Math.max(250L, nextAt - now);
+    this.player.getScheduledExecutor().schedule(this::scheduleWaitingLoop, delayMs, TimeUnit.MILLISECONDS);
   }
 }

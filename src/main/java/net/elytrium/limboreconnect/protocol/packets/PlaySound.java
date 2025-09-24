@@ -23,6 +23,8 @@ import com.velocitypowered.proxy.protocol.MinecraftPacket;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import io.netty.buffer.ByteBuf;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 public class PlaySound implements MinecraftPacket {
 
   private final String soundName;
@@ -66,7 +68,7 @@ public class PlaySound implements MinecraftPacket {
       byteBuf.writeByte((int) (this.pitch * 63.5F));
     }
     if (protocolVersion.noLessThan(ProtocolVersion.MINECRAFT_1_19)) {
-      byteBuf.writeLong(0);
+      byteBuf.writeLong(ThreadLocalRandom.current().nextLong());
     }
   }
 

@@ -160,6 +160,8 @@ public class Config extends YamlSerializable {
       public String name;
       public float volume = 1.0f;
       public float pitch = 1.0f;
+      @Comment(value = @CommentValue("Expected duration of the sound in milliseconds (0 = unknown/no loop)"))
+      public long lengthMs = 0L;
 
       public Sound() {
       }
