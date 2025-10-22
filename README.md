@@ -2,6 +2,8 @@
 
 Reconnect your players back after server restart. Built with ([**LimboAPI**](https://github.com/Elytrium/LimboAPI))
 
+[Modified for TwentyTwo minecraft server]
+
 ## Features of LimboReconnect
 
 - Reconnect all players when a server restarts;
